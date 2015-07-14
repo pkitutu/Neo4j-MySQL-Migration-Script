@@ -17,35 +17,40 @@ foreach ($client->GetLabels() as $label) {
 	}
 }
 
-$nodes = array();
 // Get each nodes properties
-foreach ($nodeNames as $node) {
-	$queryString = "MATCH (n:`". $node ."`) RETURN n LIMIT 25";
+foreach ($nodeNames as $nodeName) {
+	$queryString = "MATCH (n:`" . $nodeName . "`) return count(n) as count";
 	$query = new Everyman\Neo4j\Cypher\Query($client, $queryString);
 	$result = $query->getResultSet();
 
-	$records = array();
+	$count = 0;
 	foreach ($result as $row) {
-		$records[] = $row["n"]->getProperties();
+		$count = $row["count"];
 	}
-	$nodes[$node] = $records;
+	echo "Total Count for $nodeName: $count \n";
+
+	$storedRecords = 0;
+	while($storedRecords < $count){
+		$queryString = "MATCH (n:`". $nodeName ."`) RETURN n skip 200 limit 200";
+		$query = new Everyman\Neo4j\Cypher\Query($client, $queryString);
+		$result = $query->getResultSet();
+
+		foreach ($result as $row) {
+			saveMysql($row, $nodeName);
+			$storedRecords++;
+		}
+	}
 }
 
 // Create MySQL database tables
-
-foreach ($nodes as $nodeName => $records) {
-	try {
-		foreach ($records as $properties) {
-			$node = R::dispense(strtolower($nodeName));
-			foreach ($properties as $key=>$property) {
-				if($key != "wkt"){
-					$node[$key] = $property;
-				}
-			}
-			R::store($node);
+function saveMysql($node, $nodeName){
+	$record = R::dispense(strtolower($nodeName));
+	$properties = $node["n"]->getProperties();
+	foreach ($properties as $key=>$property) {
+		if($key != "wkt"){
+			$record[$key] = $property;
 		}
-	} catch (Exception $ex) {
-		echo $nodeName . "\n";
-		print_r($nodes[$nodeName]);
+		R::store($record);
 	}
 }
+
