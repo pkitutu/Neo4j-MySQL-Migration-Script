@@ -1,9 +1,10 @@
 <?php
 require('vendor/autoload.php');
-require('rb.php');
+//require('rb.php');
 
 R::setup( 'mysql:host=localhost;dbname=chai-crm','chai-crm', '6TWe9K7NPzT6jNDP' );
-//R::freeze( TRUE );
+R::freeze( TRUE );
+
 $client = new Everyman\Neo4j\Client();
 $client->getTransport()->setAuth('neo4j', 'neo4j');
 
@@ -29,16 +30,29 @@ foreach ($nodeNames as $nodeName) {
 	}
 	echo "Total Count for $nodeName: $count \n";
 
+	$mysql_count = 0;
+	try {
+		$mysql_count = R::count($nodeName);
+	} catch (Exception $e){
+		echo "Records do not exist for $nodeName in MySQL\n";
+	}
+	if ($mysql_count == $count) {
+		echo "Already did $nodeName, continuing \n";
+		continue;
+	}
 	$storedRecords = 0;
+	$page = 0;
+
 	while($storedRecords < $count){
-		$queryString = "MATCH (n:`". $nodeName ."`) RETURN n skip 200 limit 200";
+		$queryString = "MATCH (n:`". $nodeName ."`) RETURN n skip " . 200*$page . " limit 200";
 		$query = new Everyman\Neo4j\Cypher\Query($client, $queryString);
 		$result = $query->getResultSet();
-
+		
 		foreach ($result as $row) {
 			saveMysql($row, $nodeName);
 			$storedRecords++;
 		}
+		$page++;
 	}
 }
 
