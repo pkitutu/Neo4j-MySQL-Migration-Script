@@ -1,6 +1,6 @@
 <?php
 require('vendor/autoload.php');
-//require('rb.php');
+require('rb.php');
 
 R::setup( 'mysql:host=localhost;dbname=chai-crm','chai-crm', '6TWe9K7NPzT6jNDP' );
 R::freeze( TRUE );
@@ -42,7 +42,7 @@ foreach ($nodeNames as $nodeName) {
 	}
 	$storedRecords = 0;
 	$page = 0;
-
+	//$count = ($count < 25) ? $count : 25;
 	while($storedRecords < $count){
 		$queryString = "MATCH (n:`". $nodeName ."`) RETURN n skip " . 200*$page . " limit 200";
 		$query = new Everyman\Neo4j\Cypher\Query($client, $queryString);
@@ -58,13 +58,21 @@ foreach ($nodeNames as $nodeName) {
 
 // Create MySQL database tables
 function saveMysql($node, $nodeName){
-	$record = R::dispense(strtolower($nodeName));
-	$properties = $node["n"]->getProperties();
-	foreach ($properties as $key=>$property) {
-		if($key != "wkt"){
-			$record[$key] = $property;
+	try {
+		$record = R::dispense(strtolower($nodeName));
+		$properties = $node["n"]->getProperties();
+		foreach ($properties as $key=>$property) {
+			if($key != "wkt"){
+				$record[$key] = $property;
+			}
+			R::store($record);
 		}
-		R::store($record);
+		R::freeze( TRUE );
+	} catch(Exception $e){
+		echo $e;
+		print_r($properties);
+		R::freeze( FALSE );
+		saveMysql($node, $nodeName);
 	}
 }
 
